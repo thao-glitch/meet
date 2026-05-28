@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Random Match - Video Conference</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; display: flex; align-items: center;
+            justify-content: center; padding: 20px;
+        }
+        .container {
+            background: white; border-radius: 10px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 500px; width: 100%; padding: 40px; text-align: center;
+        }
+        .logo h1 { color: #333; font-size: 26px; margin-bottom: 30px; }
+
+        .status-area { padding: 30px 0; }
+        .status-icon { font-size: 60px; margin-bottom: 20px; }
+
+        .spinner {
+            width: 50px; height: 50px; border: 5px solid #e0e0e0;
+            border-top-color: #667eea; border-radius: 50%;
+            animation: spin 0.8s linear infinite; margin: 0 auto 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .status-text { font-size: 18px; color: #333; margin-bottom: 10px; font-weight: 500; }
+        .status-sub { font-size: 14px; color: #888; margin-bottom: 5px; }
+
+        .matched-area { display: none; }
+        .matched-user {
+            background: #f0f4ff; border-radius: 10px; padding: 20px;
+            margin: 20px 0; border: 2px solid #667eea;
+        }
+        .matched-user h3 { color: #333; margin-bottom: 5px; }
+        .matched-user .username { color: #667eea; font-size: 20px; font-weight: bold; }
+
+        .countdown { font-size: 13px; color: #888; margin-top: 10px; }
+
+        .btn-group { display: flex; gap: 10px; margin-top: 25px; flex-wrap: wrap; justify-content: center; }
+        .btn-primary {
+            padding: 14px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; border: none; border-radius: 8px; font-size: 15px;
+            font-weight: bold; cursor: pointer; transition: all 0.3s ease;
+            display: inline-flex; align-items: center; gap: 8px;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(102,126,234,0.4); }
+        .btn-secondary {
+            padding: 14px 30px; background: #757575; color: white; border: none;
+            border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer;
+            transition: all 0.3s ease; text-decoration: none; display: inline-flex;
+            align-items: center; gap: 8px;
+        }
+        .btn-secondary:hover { background: #616161; transform: translateY(-2px); }
+        .btn-danger {
+            padding: 10px 20px; background: transparent; color: #f44336;
+            border: 2px solid #f44336; border-radius: 8px; font-size: 14px;
+            font-weight: bold; cursor: pointer; transition: all 0.3s ease;
+            text-decoration: none;
+        }
+        .btn-danger:hover { background: #f44336; color: white; }
+
+        .waiting-dots::after {
+            content: ''; animation: dots 1.5s steps(4, end) infinite;
+        }
+        @keyframes dots {
+            0% { content: ''; }
+            25% { content: '.'; }
+            50% { content: '..'; }
+            75% { content: '...'; }
+            100% { content: ''; }
+        }
+
+        .error-msg {
+            background: #f8d7da; color: #721c24; padding: 12px;
+            border-radius: 5px; margin: 15px 0; display: none;
+        }
+
+        @media (max-width: 480px) {
+            .container { padding: 25px; }
+            .btn-group { flex-direction: column; }
+            .btn-primary, .btn-secondary { width: 100%; justify-content: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <h1>Random Match</h1>
+        </div>
+
+        <div class="status-area" id="waitingArea">
+            <div class="status-icon">
+                <div class="spinner"></div>
+            </div>
+            <div class="status-text">Looking for a match<span class="waiting-dots"></span></div>
+            <div class="status-sub">We'll pair you with another user</div>
+            <div class="countdown" id="waitTimer">Searching for 0s</div>
+            <div class="btn-group">
+                <button class="btn-secondary" onclick="cancelMatch()">Cancel</button>
+            </div>
+        </div>
+
+        <div class="matched-area" id="matchedArea">
+            <div class="status-icon"> Match Found!</div>
+            <div class="matched-user">
+                <div class="status-sub">You matched with</div>
+                <div class="username" id="matchedUsername">---</div>
+            </div>
+            <div class="countdown">Redirecting to video room in <span id="countdownSeconds">3</span>s</div>
+            <div class="btn-group">
+                <button class="btn-primary" id="joinCallBtn" onclick="joinCall()">
+                    Join Call
+                </button>
+                <button class="btn-secondary" id="nextBtn" onclick="nextMatch()">
+                    Next
+                </button>
+            </div>
+        </div>
+
+        <div class="error-msg" id="errorMsg"></div>
+
+        <a href="/video/join/" style="display:inline-block;margin-top:15px;color:#888;font-size:13px;text-decoration:none;">
+            &larr; Back to lobby
+        </a>
+    </div>
+
+    <script>
+        let pollInterval = null;
+        let waitStartTime = Date.now();
+        let currentRoomId = null;
+        let countdownInterval = null;
+        let matchedUserId = null;
+
+        async function findMatch() {
+            try {
+                const resp = await fetch('/video/api/random-match/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json',
+                               'X-CSRFToken': getCookie('csrftoken') },
+                    body: JSON.stringify({
+                        is_next: false,
+                        prev_room_id: null
+                    })
+                });
+                const data = await resp.json();
+
+                if (data.status === 'matched') {
+                    clearInterval(pollInterval);
+                    currentRoomId = data.room_id;
+                    matchedUserId = data.matched_user.id;
+                    showMatched(data.matched_user.username);
+                }
+            } catch (e) {
+                console.error('Match error:', e);
+                showError('Failed to find a match. Please try again.');
+            }
+        }
+
+        async function pollForMatch() {
+            try {
+                const resp = await fetch('/video/api/random-match/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json',
+                               'X-CSRFToken': getCookie('csrftoken') },
+                    body: JSON.stringify({
+                        is_next: false,
+                        prev_room_id: null
+                    })
+                });
+                const data = await resp.json();
+
+                if (data.status === 'matched') {
+                    clearInterval(pollInterval);
+                    currentRoomId = data.room_id;
+                    matchedUserId = data.matched_user.id;
+                    showMatched(data.matched_user.username);
+                }
+            } catch (e) {
+                console.error('Poll error:', e);
+            }
+        }
+
+        function showMatched(username) {
+            document.getElementById('waitingArea').style.display = 'none';
+            document.getElementById('matchedArea').style.display = 'block';
+            document.getElementById('matchedUsername').textContent = username;
+
+            let countdown = 3;
+            document.getElementById('countdownSeconds').textContent = countdown;
+            countdownInterval = setInterval(() => {
+                countdown--;
+                document.getElementById('countdownSeconds').textContent = countdown;
+                if (countdown <= 0) {
+                    clearInterval(countdownInterval);
+                    joinCall();
+                }
+            }, 1000);
+        }
+
+        function joinCall() {
+            if (currentRoomId) {
+                window.location.href = '/video/room/' + currentRoomId + '/';
+            }
+        }
+
+        async function nextMatch() {
+            // End current room and find new match
+            if (countdownInterval) clearInterval(countdownInterval);
+
+            try {
+                const resp = await fetch('/video/api/random-match/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json',
+                               'X-CSRFToken': getCookie('csrftoken') },
+                    body: JSON.stringify({
+                        is_next: true,
+                        prev_room_id: currentRoomId
+                    })
+                });
+                const data = await resp.json();
+
+                if (data.status === 'matched') {
+                    currentRoomId = data.room_id;
+                    matchedUserId = data.matched_user.id;
+                    document.getElementById('matchedUsername').textContent = data.matched_user.username;
+                    let countdown = 3;
+                    document.getElementById('countdownSeconds').textContent = countdown;
+                    countdownInterval = setInterval(() => {
+                        countdown--;
+                        document.getElementById('countdownSeconds').textContent = countdown;
+                        if (countdown <= 0) {
+                            clearInterval(countdownInterval);
+                            joinCall();
+                        }
+                    }, 1000);
+                } else if (data.status === 'waiting') {
+                    // No match available, go back to waiting
+                    document.getElementById('matchedArea').style.display = 'none';
+                    document.getElementById('waitingArea').style.display = 'block';
+                    pollInterval = setInterval(pollForMatch, 2000);
+                    waitStartTime = Date.now();
+                }
+            } catch (e) {
+                console.error('Next match error:', e);
+                showError('Failed to find next match. Please try again.');
+            }
+        }
+
+        async function cancelMatch() {
+            if (pollInterval) clearInterval(pollInterval);
+            if (countdownInterval) clearInterval(countdownInterval);
+
+            try {
+                await fetch('/video/api/random-match/cancel/', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': getCookie('csrftoken') }
+                });
+            } catch (e) {}
+
+            window.location.href = '/video/join/';
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('errorMsg');
+            el.textContent = msg;
+            el.style.display = 'block';
+        }
+
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return '';
+        }
+
+        // Update wait timer
+        setInterval(() => {
+            const elapsed = Math.floor((Date.now() - waitStartTime) / 1000);
+            document.getElementById('waitTimer').textContent = `Searching for ${elapsed}s`;
+        }, 1000);
+
+        // Start by trying to find a match immediately
+        document.addEventListener('DOMContentLoaded', () => {
+            findMatch();
+            // Poll for matches every 2 seconds
+            pollInterval = setInterval(pollForMatch, 2000);
+        });
+    </script>
+</body>
+</html>

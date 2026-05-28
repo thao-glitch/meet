@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Video Conference</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 450px;
+            width: 100%;
+            padding: 40px;
+        }
+        .logo { text-align: center; margin-bottom: 30px; }
+        .logo h1 { color: #333; font-size: 28px; margin-bottom: 10px; }
+        .logo p { color: #888; font-size: 14px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; color: #333; font-weight: 500; font-size: 14px; }
+        input {
+            width: 100%; padding: 12px; border: 1px solid #ddd;
+            border-radius: 5px; font-size: 14px; transition: border-color 0.3s ease;
+        }
+        input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+        .error-message {
+            background: #f8d7da; color: #721c24; padding: 12px;
+            border-radius: 5px; margin-bottom: 20px; border: 1px solid #f5c6cb;
+        }
+        .success-message {
+            background: #d4edda; color: #155724; padding: 12px;
+            border-radius: 5px; margin-bottom: 20px; border: 1px solid #c3e6cb;
+        }
+        button {
+            width: 100%; padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; border: none; border-radius: 5px;
+            font-size: 16px; font-weight: bold; cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease; margin-top: 10px;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(102,126,234,0.4); }
+        .links { text-align: center; margin-top: 20px; }
+        .links a { color: #667eea; text-decoration: none; font-size: 14px; }
+        .links a:hover { text-decoration: underline; }
+        .divider { text-align: center; color: #888; margin: 20px 0; font-size: 12px; }
+        @media (max-width: 480px) {
+            .container { padding: 25px; }
+            .logo h1 { font-size: 24px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <h1>Video Conference</h1>
+            <p>Sign in to your account</p>
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="{% if message.tags == 'error' %}error{% else %}success{% endif %}-message">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <form method="post" novalidate>
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" placeholder="Enter your username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" placeholder="Enter your password" required>
+            </div>
+            <button type="submit">Sign In</button>
+        </form>
+
+        <div class="divider">— or —</div>
+
+        <div class="links">
+            Don't have an account? <a href="/video/register/">Register here</a>
+        </div>
+    </div>
+</body>
+</html>

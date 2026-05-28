@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Silent Monitor - Video Conference</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: rgba(139, 0, 0, 0.7);
+            border-radius: 10px;
+            flex-wrap: wrap;
+            gap: 20px;
+            border: 3px solid #ff4444;
+        }
+
+        .header h1 {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .admin-badge {
+            background: #ff4444;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-weight: bold;
+            animation: blink 1.5s infinite;
+        }
+
+        @keyframes blink {
+            0%, 49%, 100% {
+                opacity: 1;
+            }
+            50%, 99% {
+                opacity: 0.7;
+            }
+        }
+
+        .header-info {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .info-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 15px;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .video-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+            min-height: 400px;
+        }
+
+        .video-wrapper {
+            position: relative;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            aspect-ratio: 16 / 9;
+        }
+
+        .admin-video .video-wrapper {
+            border: 3px solid #ff4444;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .video-label {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-weight: bold;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .admin-video .video-label {
+            background: rgba(255, 68, 68, 0.9);
+        }
+
+        .status-badge {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4CAF50;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            padding: 20px;
+            background: rgba(139, 0, 0, 0.3);
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: 2px solid #ff4444;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 120px;
+            justify-content: center;
+            background: rgba(255, 68, 68, 0.2);
+            color: white;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        button:hover:not(:disabled) {
+            background: rgba(255, 68, 68, 0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+        }
+
+        .status-panel {
+            background: rgba(139, 0, 0, 0.3);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .status-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 12px;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .status-label {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+
+        .status-value {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .monitoring-info {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #ff4444;
+            margin-bottom: 20px;
+        }
+
+        .monitoring-info h3 {
+            margin-bottom: 10px;
+            color: #ffaaaa;
+        }
+
+        .monitoring-info ul {
+            list-style: none;
+            margin-left: 20px;
+        }
+
+        .monitoring-info li {
+            margin: 5px 0;
+        }
+
+        .monitoring-info li:before {
+            content: "→ ";
+            color: #ff4444;
+            font-weight: bold;
+        }
+
+        .error {
+            background: #f44336;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .error.show {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .video-container {
+                grid-template-columns: 1fr;
+            }
+
+            .header {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            button {
+                min-width: 100px;
+                padding: 10px 16px;
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>👁️ ADMIN SILENT MONITOR</h1>
+            <div class="admin-badge">🔐 Hidden Observer Mode</div>
+            <div class="header-info">
+                <div class="info-item">
+                    <span>Room:</span>
+                    <strong id="roomId">Loading...</strong>
+                </div>
+                <div class="info-item">
+                    <span>Peers:</span>
+                    <strong id="peerCount">0</strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="monitoring-info">
+            <h3>⚠️ Silent Monitoring Active</h3>
+            <ul>
+                <li>Your video and audio are completely disabled</li>
+                <li>You are viewing this session as a hidden observer</li>
+                <li>Other participants cannot see or hear you</li>
+                <li>You can silently monitor all participant interactions</li>
+                <li>Use "End Session" button below if necessary</li>
+            </ul>
+        </div>
+
+        <div id="errorBox" class="error"></div>
+
+        <div class="status-panel">
+            <div class="status-item">
+                <div class="status-label">Connection Status</div>
+                <div class="status-value" id="connectionStatus">Connecting...</div>
+            </div>
+            <div class="status-item">
+                <div class="status-label">Monitoring Since</div>
+                <div class="status-value" id="monitoringTime">--:--:--</div>
+            </div>
+            <div class="status-item">
+                <div class="status-label">Active Participants</div>
+                <div class="status-value" id="participantCount">0</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button onclick="refreshPeerList()">🔄 Refresh Peers</button>
+            <button onclick="endSession()" style="background: rgba(255, 68, 68, 0.6); border-color: #ff4444;">
+                ⛔ End Session
+            </button>
+            <button onclick="window.history.back()">← Back</button>
+        </div>
+
+        <div class="video-container" id="videoGrid">
+            <!-- Videos will be dynamically added here -->
+        </div>
+    </div>
+
+    <!-- Socket.IO library -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+
+    <!-- WebRTC Client with Admin Mode Override -->
+    <script>
+        // Set admin mode flag before loading webrtc.js
+        window.IS_ADMIN = true;
+    </script>
+    <script src="../static/webrtc.js"></script>
+
+    <!-- Admin-specific functions -->
+    <script>
+        let monitoringStartTime = null;
+
+        /**
+         * Refresh the peer list
+         */
+        function refreshPeerList() {
+            if (socket) {
+                socket.emit('get_room_peers', {
+                    room_id: roomState.roomId
+                });
+                logger('Peer list refreshed');
+            }
+        }
+
+        /**
+         * End the session (admin only)
+         */
+        function endSession() {
+            if (confirm('Are you sure you want to END this session for all participants?')) {
+                if (confirm('This action cannot be undone. All participants will be disconnected.')) {
+                    socket.emit('end_room', {
+                        room_id: roomState.roomId,
+                        initiator_user_id: currentUser.id
+                    });
+
+                    setTimeout(() => {
+                        window.location.href = '/admin/video-monitor/';
+                    }, 2000);
+                }
+            }
+        }
+
+        /**
+         * Update monitoring time
+         */
+        function updateMonitoringTime() {
+            if (!monitoringStartTime) {
+                monitoringStartTime = new Date();
+            }
+
+            const now = new Date();
+            const diff = Math.floor((now - monitoringStartTime) / 1000);
+            const hours = Math.floor(diff / 3600);
+            const minutes = Math.floor((diff % 3600) / 60);
+            const seconds = diff % 60;
+
+            document.getElementById('monitoringTime').textContent =
+                `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        // Start monitoring time update
+        document.addEventListener('DOMContentLoaded', () => {
+            setInterval(updateMonitoringTime, 1000);
+        });
+
+        // Override remote video element creation to add admin styling
+        const originalCreateRemoteVideoElement = window.createRemoteVideoElement;
+        window.createRemoteVideoElement = function(peerId, peerUsername, mediaStream) {
+            const videoGrid = document.getElementById('videoGrid');
+
+            if (document.getElementById(`video-${peerId}`)) {
+                return;
+            }
+
+            const videoWrapper = document.createElement('div');
+            videoWrapper.className = 'video-wrapper remote-video';
+            videoWrapper.id = `video-${peerId}`;
+
+            const video = document.createElement('video');
+            video.id = `remoteVideo-${peerId}`;
+            video.autoplay = true;
+            video.playsInline = true;
+
+            const label = document.createElement('div');
+            label.className = 'video-label';
+            label.innerHTML = `<div class="status-badge"></div><span>${peerUsername}</span>`;
+
+            videoWrapper.appendChild(video);
+            videoWrapper.appendChild(label);
+            videoGrid.appendChild(videoWrapper);
+
+            video.srcObject = mediaStream;
+            logger(`Remote video element created for ${peerUsername} (Admin Monitoring)`);
+        };
+    </script>
+</body>
+</html>

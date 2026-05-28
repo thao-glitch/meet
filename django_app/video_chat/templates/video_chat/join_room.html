@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Join Video Call - Video Conference</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px; margin: 0 auto;
+        }
+        .header {
+            background: white; border-radius: 10px; padding: 20px 30px;
+            margin-bottom: 20px; display: flex; justify-content: space-between;
+            align-items: center; flex-wrap: wrap; gap: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .header h1 { color: #333; font-size: 24px; }
+        .user-info { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
+        .user-info span { color: #666; font-size: 14px; }
+        .user-info strong { color: #333; }
+        .logout-btn {
+            padding: 8px 16px; background: #f44336; color: white; border: none;
+            border-radius: 5px; cursor: pointer; font-size: 13px; text-decoration: none;
+        }
+        .logout-btn:hover { background: #da190b; }
+
+        .card {
+            background: white; border-radius: 10px; padding: 25px 30px;
+            margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .card h2 { color: #333; font-size: 18px; margin-bottom: 15px; }
+
+        .random-match-area {
+            text-align: center; padding: 30px;
+            background: linear-gradient(135deg, #667eea22 0%, #764ba222 100%);
+            border: 2px dashed #667eea; border-radius: 10px;
+        }
+        .random-match-btn {
+            padding: 18px 40px; font-size: 18px; font-weight: bold;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; border: none; border-radius: 10px; cursor: pointer;
+            transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 10px;
+        }
+        .random-match-btn:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(102,126,234,0.4); }
+        .random-match-desc { color: #666; margin-top: 12px; font-size: 14px; }
+
+        .search-bar {
+            width: 100%; padding: 12px 16px; border: 2px solid #e0e0e0;
+            border-radius: 8px; font-size: 15px; margin-bottom: 20px;
+            transition: border-color 0.3s ease;
+        }
+        .search-bar:focus { outline: none; border-color: #667eea; }
+
+        .user-count { color: #888; font-size: 13px; margin-bottom: 15px; }
+
+        .user-list { max-height: 500px; overflow-y: auto; }
+        .user-item {
+            display: flex; align-items: center; padding: 12px 15px;
+            border-radius: 8px; cursor: pointer; transition: all 0.2s ease;
+            border: 1px solid #eee; margin-bottom: 5px;
+        }
+        .user-item:hover { background: #f0f4ff; border-color: #667eea; }
+        .user-item.selected { background: #e8eeff; border-color: #667eea; }
+
+        .status-dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            margin-right: 12px; flex-shrink: 0;
+        }
+        .status-dot.online { background: #4CAF50; box-shadow: 0 0 6px #4CAF5099; }
+        .status-dot.offline { background: #bdbdbd; }
+
+        .user-name { font-weight: 500; color: #333; flex: 1; }
+        .user-status-label { font-size: 12px; color: #888; margin-right: 10px; }
+
+        .user-checkbox {
+            width: 18px; height: 18px; margin-right: 12px; accent-color: #667eea;
+            cursor: pointer;
+        }
+        .group-actions { margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap; }
+        .group-actions button { display: none; }
+
+        .btn-primary {
+            padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; border: none; border-radius: 5px; font-size: 14px;
+            font-weight: bold; cursor: pointer; transition: all 0.3s ease;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(102,126,234,0.4); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        .section-divider { margin: 20px 0; border: 0; height: 1px; background: #eee; }
+        .section-label {
+            display: flex; align-items: center; gap: 8px;
+            color: #555; font-size: 13px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;
+        }
+        .section-label .count {
+            background: #e0e0e0; padding: 2px 8px; border-radius: 10px;
+            font-size: 11px; color: #666;
+        }
+
+        .tab-bar {
+            display: flex; gap: 0; margin-bottom: 20px;
+            background: #f5f5f5; border-radius: 8px; padding: 3px;
+        }
+        .tab {
+            flex: 1; padding: 10px; text-align: center; border-radius: 6px;
+            cursor: pointer; font-weight: 500; color: #666; font-size: 14px;
+            transition: all 0.2s ease; border: none; background: transparent;
+        }
+        .tab.active { background: white; color: #333; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+        .tab:hover:not(.active) { color: #333; }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .info-banner {
+            background: #e3f2fd; border-left: 4px solid #667eea;
+            color: #1565c0; padding: 15px; border-radius: 5px;
+            margin-bottom: 20px; font-size: 14px;
+        }
+
+        @media (max-width: 600px) {
+            .header { flex-direction: column; text-align: center; }
+            .card { padding: 20px; }
+            .random-match-btn { width: 100%; justify-content: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Video Conference</h1>
+            <div class="user-info">
+                <span>Welcome, <strong>{{ user.first_name|default:user.username }}</strong></span>
+                <span style="font-size:12px;opacity:0.7;">{{ profile.age }} years old</span>
+                <a href="/video/logout/" class="logout-btn">Logout</a>
+            </div>
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="info-banner">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- Random Match Card -->
+        <div class="card">
+            <h2>Random Match</h2>
+            <div class="random-match-area">
+                <button class="random-match-btn" onclick="startRandomMatch()">
+                    Random Match
+                </button>
+                <p class="random-match-desc">
+                    Get paired with a random user for a video chat. Click <strong>Next</strong> to skip to someone new.
+                </p>
+            </div>
+        </div>
+
+        <!-- User List Card -->
+        <div class="card">
+            <h2>Users</h2>
+            <input type="text" class="search-bar" id="userSearch"
+                   placeholder="Search by username..." oninput="filterUsers()">
+
+            <div class="tab-bar">
+                <button class="tab active" data-tab="1v1" onclick="switchTab('1v1')">1v1 Call</button>
+                <button class="tab" data-tab="group" onclick="switchTab('group')">Group Call</button>
+            </div>
+
+            <div id="tab-1v1" class="tab-content active">
+                <p class="user-count" id="userCount1v1">Loading users...</p>
+                <div class="user-list" id="userList1v1">
+                    <p style="color:#888;text-align:center;padding:20px;">Loading...</p>
+                </div>
+            </div>
+
+            <div id="tab-group" class="tab-content">
+                <p class="user-count" id="userCountGroup">Loading users...</p>
+                <div class="user-list" id="userListGroup">
+                    <p style="color:#888;text-align:center;padding:20px;">Loading...</p>
+                </div>
+                <div class="group-actions" id="groupActions">
+                    <button class="btn-primary" id="startGroupCall" onclick="startGroupCall()" disabled>
+                        Start Group Call (<span id="selectedCount">0</span> selected)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allUsers = [];
+        let selectedGroupUsers = new Set();
+
+        async function fetchUsers() {
+            try {
+                const resp = await fetch('/video/api/users/');
+                const data = await resp.json();
+                if (data.status === 'success') {
+                    allUsers = data.users;
+                    renderUsers();
+                }
+            } catch (e) {
+                console.error('Failed to fetch users:', e);
+                document.getElementById('userList1v1').innerHTML =
+                    '<p style="color:#f44336;text-align:center;padding:20px;">Failed to load users.</p>';
+                document.getElementById('userListGroup').innerHTML =
+                    '<p style="color:#f44336;text-align:center;padding:20px;">Failed to load users.</p>';
+            }
+        }
+
+        function renderUsers() {
+            const searchTerm = document.getElementById('userSearch').value.toLowerCase();
+            const online = allUsers.filter(u => u.is_online && u.username.toLowerCase().includes(searchTerm));
+            const offline = allUsers.filter(u => !u.is_online && u.username.toLowerCase().includes(searchTerm));
+
+            document.getElementById('userCount1v1').textContent =
+                `${allUsers.length} registered users (${online.length} online)`;
+            document.getElementById('userCountGroup').textContent =
+                `${allUsers.length} registered users (${online.length} online)`;
+
+            render1v1List(online, offline);
+            renderGroupList(online, offline);
+        }
+
+        function render1v1List(online, offline) {
+            const container = document.getElementById('userList1v1');
+            let html = '';
+
+            if (online.length > 0) {
+                html += '<div class="section-label">Online <span class="count">' + online.length + '</span></div>';
+                online.forEach(u => {
+                    html += userItemHtml(u, '1v1', true);
+                });
+            }
+
+            if (offline.length > 0) {
+                html += '<div class="section-label" style="margin-top:12px;">Offline <span class="count">' + offline.length + '</span></div>';
+                offline.forEach(u => {
+                    html += userItemHtml(u, '1v1', false);
+                });
+            }
+
+            if (online.length === 0 && offline.length === 0) {
+                html = '<p style="color:#888;text-align:center;padding:20px;">No users found.</p>';
+            }
+
+            container.innerHTML = html;
+        }
+
+        function renderGroupList(online, offline) {
+            const container = document.getElementById('userListGroup');
+            let html = '';
+
+            if (online.length > 0) {
+                html += '<div class="section-label">Online <span class="count">' + online.length + '</span></div>';
+                online.forEach(u => {
+                    const checked = selectedGroupUsers.has(u.id) ? 'checked' : '';
+                    html += `
+                        <div class="user-item" onclick="toggleGroupUser(${u.id}, '${u.username}')">
+                            <input type="checkbox" class="user-checkbox" ${checked} data-id="${u.id}">
+                            <div class="status-dot online"></div>
+                            <span class="user-name">${u.username}</span>
+                            <span class="user-status-label">online</span>
+                        </div>
+                    `;
+                });
+            }
+
+            if (offline.length > 0) {
+                html += '<div class="section-label" style="margin-top:12px;">Offline <span class="count">' + offline.length + '</span></div>';
+                offline.forEach(u => {
+                    const checked = selectedGroupUsers.has(u.id) ? 'checked' : '';
+                    html += `
+                        <div class="user-item" onclick="toggleGroupUser(${u.id}, '${u.username}')">
+                            <input type="checkbox" class="user-checkbox" ${checked} data-id="${u.id}">
+                            <div class="status-dot offline"></div>
+                            <span class="user-name">${u.username}</span>
+                            <span class="user-status-label">offline</span>
+                        </div>
+                    `;
+                });
+            }
+
+            if (online.length === 0 && offline.length === 0) {
+                html = '<p style="color:#888;text-align:center;padding:20px;">No users found.</p>';
+            }
+
+            container.innerHTML = html;
+            updateGroupButton();
+        }
+
+        function userItemHtml(user, mode, isOnline) {
+            return `
+                <div class="user-item" onclick="start1v1Call(${user.id}, '${user.username}')">
+                    <div class="status-dot ${isOnline ? 'online' : 'offline'}"></div>
+                    <span class="user-name">${user.username}</span>
+                    <span class="user-status-label">${isOnline ? 'online' : 'offline'}</span>
+                </div>
+            `;
+        }
+
+        function filterUsers() {
+            renderUsers();
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelector(`.tab[data-tab="${tab}"]`).classList.add('active');
+            document.getElementById(`tab-${tab}`).classList.add('active');
+        }
+
+        function start1v1Call(userId, username) {
+            const roomId = '1v1-' + Date.now() + '-' + userId;
+            window.location.href = '/video/room/' + roomId + '/';
+        }
+
+        function toggleGroupUser(userId, username) {
+            const checkbox = document.querySelector(`.user-checkbox[data-id="${userId}"]`);
+            if (selectedGroupUsers.has(userId)) {
+                selectedGroupUsers.delete(userId);
+                if (checkbox) checkbox.checked = false;
+            } else {
+                selectedGroupUsers.add(userId);
+                if (checkbox) checkbox.checked = true;
+            }
+            updateGroupButton();
+        }
+
+        function updateGroupButton() {
+            const btn = document.getElementById('startGroupCall');
+            const count = selectedGroupUsers.size;
+            document.getElementById('selectedCount').textContent = count;
+            btn.disabled = count === 0;
+            btn.style.display = count > 0 ? 'inline-flex' : 'none';
+        }
+
+        function startGroupCall() {
+            if (selectedGroupUsers.size === 0) return;
+            const userIds = Array.from(selectedGroupUsers);
+            const roomId = 'group-' + Date.now() + '-' + userIds.join('-');
+            // We'll include selected users via URL params; the Flask server will handle multi-peer
+            window.location.href = '/video/room/' + roomId + '/?invited=' + userIds.join(',');
+        }
+
+        function startRandomMatch() {
+            window.location.href = '/video/random-match/';
+        }
+
+        document.addEventListener('DOMContentLoaded', fetchUsers);
+    </script>
+</body>
+</html>
