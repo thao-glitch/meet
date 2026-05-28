@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "name": "conference",
+  "builds": [
+    { "src": "frontend/**", "use": "@vercel/static" }
+  ],
+  "routes": [
+    { "src": "^/$", "dest": "/frontend/room.html" },
+    { "src": "^/admin/?$", "dest": "/frontend/admin_monitor.html" },
+    { "src": "^/(.*)$", "dest": "/frontend/$1" }
+  ]
+}
