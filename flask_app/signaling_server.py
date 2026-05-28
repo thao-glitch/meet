@@ -8,6 +8,9 @@ This server handles real-time WebRTC signaling:
 - Room state management
 - Silent admin monitoring
 """
+import eventlet
+eventlet.monkey_patch()
+
 import os
 import logging
 from datetime import datetime
@@ -42,7 +45,7 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
-    async_mode='threading',
+    async_mode='eventlet',
     ping_timeout=60,
     ping_interval=25,
     logger=True,

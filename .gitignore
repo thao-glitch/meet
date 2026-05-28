@@ -90,6 +90,12 @@ celerybeat-schedule
 *.backup
 *~
 
+# Scratch / test files
+cmd_test.txt
+temp_cmd_check.cmd
+test_output.txt
+pip_install.log
+
 # Temporary files
 tmp/
 temp/

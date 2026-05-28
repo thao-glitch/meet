@@ -1,3 +1,19 @@
+/**
+ * WebRTC Video Conference Client
+ *
+ * Implements a full mesh WebRTC architecture for multi-peer video conferencing.
+ * Features:
+ * - Support for 1v1 and group video sessions
+ * - Dynamic peer connection management
+ * - ICE candidate handling
+ * - Audio/video track management
+ * - Bandwidth optimization
+ */
+
+// ============================================================================
+// Configuration
+// ============================================================================
+
 const CONFIG = {
     iceServers: [
         { urls: ['stun:stun.l.google.com:19302'] },
@@ -18,11 +34,15 @@ const CONFIG = {
     }
 };
 
+// ============================================================================
+// Global State
+// ============================================================================
+
 let localStream = null;
 let socket = null;
-let peerConnections = {};
-let dataChannels = {};
-let remoteStreams = {};
+let peerConnections = {}; // {userId: RTCPeerConnection}
+let dataChannels = {}; // {userId: RTCDataChannel}
+let remoteStreams = {}; // {userId: MediaStream}
 
 let currentUser = {
     id: null,
@@ -32,10 +52,11 @@ let currentUser = {
 let roomState = {
     roomId: null,
     sessionType: 'group',
-    peers: [],
+    peers: [], // List of peer objects {userId, username}
     isAdmin: false,
 };
 
+// Statistics
 let stats = {
     videoResolution: '1280x720',
     networkLatency: 0,
@@ -43,38 +64,50 @@ let stats = {
     packetsReceived: 0,
 };
 
+// ============================================================================
+// Initialization
+// ============================================================================
+
+/**
+ * Initialize the video conference client
+ */
 async function initializeConference() {
     try {
-        const roomId = document.getElementById('roomId')?.textContent ||
+        // Extract room details from page metadata
+        const roomId = document.getElementById('roomId')?.textContent || 
                       new URLSearchParams(window.location.search).get('room_id') ||
                       'default-room';
-
-        const userId = window.USER_ID || 1;
-        const username = window.USERNAME || 'Anonymous';
+        
+        const userId = document.querySelector('[data-user-id]')?.dataset.userId ||
+                      window.USER_ID || 1;
+        
+        const username = document.querySelector('[data-username]')?.dataset.username ||
+                        window.USERNAME || 'Anonymous';
 
         currentUser.id = parseInt(userId);
         currentUser.username = username;
         roomState.roomId = roomId;
         roomState.isAdmin = window.IS_ADMIN || false;
-        roomState.sessionType = window.ROOM_SESSION_TYPE || 'group';
 
+        // Update UI
         document.getElementById('roomId').textContent = roomId;
         document.getElementById('userName').textContent = username;
 
+        // Initialize Socket.IO connection
         await initializeSocket();
+
+        // Get local media stream
         await getLocalStream();
+
+        // Create local video element
         createLocalVideoElement();
 
+        // Show main content
         document.getElementById('loadingBox').style.display = 'none';
         document.getElementById('mainContent').style.display = 'block';
 
+        // Update connection status
         updateConnectionStatus('Connected');
-
-        // Show "Next" button for random match rooms
-        const nextBtn = document.getElementById('nextMatchBtn');
-        if (nextBtn && roomId && roomId.startsWith && roomId.startsWith('1v1-')) {
-            nextBtn.style.display = 'inline-flex';
-        }
 
         logger('Video conference initialized successfully');
     } catch (error) {
@@ -83,6 +116,9 @@ async function initializeConference() {
     }
 }
 
+/**
+ * Initialize Socket.IO connection
+ */
 function initializeSocket() {
     return new Promise((resolve, reject) => {
         try {
@@ -99,6 +135,7 @@ function initializeSocket() {
                 logger(`Connected to signaling server: ${socket.id}`);
                 updateConnectionStatus('Connected');
 
+                // Join room
                 socket.emit('join_room', {
                     user_id: currentUser.id,
                     room_id: roomState.roomId,
@@ -123,19 +160,23 @@ function initializeSocket() {
                 logger(`Server response: ${data.data}`);
             });
 
+            // Handle authentication failures
             socket.on('auth_failed', (data) => {
                 showError(`Authentication failed: ${data.message}`);
                 logger(`Auth failed: ${data.message}`, 'error');
             });
 
+            // Handle room events
             socket.on('room_joined', handleRoomJoined);
             socket.on('peer_joined', handlePeerJoined);
             socket.on('peer_disconnected', handlePeerDisconnected);
             socket.on('room_ended', handleRoomEnded);
 
+            // Handle WebRTC signals
             socket.on('webrtc_signal', handleWebRTCSignal);
             socket.on('room_peers', handleRoomPeers);
 
+            // Handle errors
             socket.on('signal_error', (data) => {
                 logger(`Signal error: ${data.message}`, 'error');
             });
@@ -146,8 +187,12 @@ function initializeSocket() {
     });
 }
 
+/**
+ * Get local media stream (audio and video)
+ */
 async function getLocalStream() {
     try {
+        // For admin monitoring mode, get media but disable tracks
         const constraints = {
             audio: CONFIG.audioConstraints,
             video: CONFIG.videoConstraints,
@@ -160,6 +205,7 @@ async function getLocalStream() {
         localStream = await navigator.mediaDevices.getUserMedia(constraints);
 
         if (roomState.isAdmin) {
+            // Disable all tracks for silent monitoring
             localStream.getTracks().forEach(track => {
                 track.enabled = false;
             });
@@ -175,20 +221,32 @@ async function getLocalStream() {
     }
 }
 
+// ============================================================================
+// Socket Event Handlers
+// ============================================================================
+
+/**
+ * Handle room joined event
+ */
 function handleRoomJoined(data) {
     logger(`Room joined: ${data.room_id} with ${data.existing_peers.length} existing peers`);
 
     roomState.peers = data.existing_peers || [];
     updatePeerCount();
 
+    // For each existing peer, initiate connection (as offerer)
     data.existing_peers.forEach(peer => {
         createPeerConnection(peer.user_id, peer.username, true);
     });
 }
 
+/**
+ * Handle peer joined event
+ */
 function handlePeerJoined(data) {
     logger(`Peer joined: ${data.username} (ID: ${data.user_id})`);
 
+    // Add to peers list
     if (!roomState.peers.find(p => p.user_id === data.user_id)) {
         roomState.peers.push({
             user_id: data.user_id,
@@ -197,39 +255,56 @@ function handlePeerJoined(data) {
     }
 
     updatePeerCount();
+
+    // Create connection with new peer (as answerer)
     createPeerConnection(data.user_id, data.username, false);
 }
 
+/**
+ * Handle peer disconnected event
+ */
 function handlePeerDisconnected(data) {
     logger(`Peer disconnected: ${data.username} (ID: ${data.user_id})`);
 
+    // Remove from peers list
     roomState.peers = roomState.peers.filter(p => p.user_id !== data.user_id);
     updatePeerCount();
 
+    // Close peer connection
     if (data.user_id in peerConnections) {
         peerConnections[data.user_id].close();
         delete peerConnections[data.user_id];
     }
 
+    // Remove video element
     removeVideoElement(data.user_id);
 }
 
+/**
+ * Handle room ended event
+ */
 function handleRoomEnded(data) {
     logger(`Room ended: ${data.message}`, 'warning');
     showError(`Room ended: ${data.message}`);
 
+    // Close all connections
     Object.values(peerConnections).forEach(pc => pc.close());
     peerConnections = {};
 
+    // Stop local stream
     if (localStream) {
         localStream.getTracks().forEach(track => track.stop());
     }
 
+    // Redirect or show end screen
     setTimeout(() => {
         window.location.href = '/video/join/';
     }, 3000);
 }
 
+/**
+ * Handle WebRTC signaling events
+ */
 function handleWebRTCSignal(data) {
     const { from_user_id, type, payload } = data;
 
@@ -263,10 +338,21 @@ function handleWebRTCSignal(data) {
     }
 }
 
+/**
+ * Handle room peers list
+ */
 function handleRoomPeers(data) {
     logger(`Room peers: ${data.peers.length} peers in room`);
+    // Can be used to sync state if needed
 }
 
+// ============================================================================
+// Peer Connection Management
+// ============================================================================
+
+/**
+ * Create a new RTCPeerConnection for a peer
+ */
 function createPeerConnection(peerId, peerUsername, shouldCreateOffer) {
     logger(`Creating peer connection with user ${peerUsername} (ID: ${peerId}), shouldCreateOffer: ${shouldCreateOffer}`);
 
@@ -279,10 +365,12 @@ function createPeerConnection(peerId, peerUsername, shouldCreateOffer) {
         iceServers: CONFIG.iceServers
     });
 
+    // Add local stream tracks
     localStream.getTracks().forEach(track => {
         peerConnection.addTrack(track, localStream);
     });
 
+    // Handle remote stream
     peerConnection.ontrack = (event) => {
         logger(`Received remote track from ${peerId}: ${event.track.kind}`);
 
@@ -294,6 +382,7 @@ function createPeerConnection(peerId, peerUsername, shouldCreateOffer) {
         remoteStreams[peerId].addTrack(event.track);
     };
 
+    // Handle ICE candidates
     peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
             logger(`ICE candidate generated for ${peerId}`);
@@ -308,6 +397,7 @@ function createPeerConnection(peerId, peerUsername, shouldCreateOffer) {
         }
     };
 
+    // Handle connection state changes
     peerConnection.onconnectionstatechange = () => {
         logger(`Connection state change for ${peerId}: ${peerConnection.connectionState}`);
 
@@ -322,6 +412,7 @@ function createPeerConnection(peerId, peerUsername, shouldCreateOffer) {
         }
     };
 
+    // Handle ICE connection state changes
     peerConnection.oniceconnectionstatechange = () => {
         logger(`ICE connection state change for ${peerId}: ${peerConnection.iceConnectionState}`);
     };
@@ -330,8 +421,10 @@ function createPeerConnection(peerId, peerUsername, shouldCreateOffer) {
         logger(`Signaling state change for ${peerId}: ${peerConnection.signalingState}`);
     };
 
+    // Store connection
     peerConnections[peerId] = peerConnection;
 
+    // Create offer if needed
     if (shouldCreateOffer) {
         createOffer(peerId, peerConnection);
     }
@@ -339,6 +432,9 @@ function createPeerConnection(peerId, peerUsername, shouldCreateOffer) {
     return peerConnection;
 }
 
+/**
+ * Create and send an offer to a peer
+ */
 async function createOffer(peerId, peerConnection) {
     try {
         logger(`Creating offer for peer ${peerId}`);
@@ -363,6 +459,9 @@ async function createOffer(peerId, peerConnection) {
     }
 }
 
+/**
+ * Handle received offer
+ */
 async function handleOffer(peerConnection, peerId, offer) {
     try {
         logger(`Handling offer from ${peerId}`);
@@ -386,6 +485,9 @@ async function handleOffer(peerConnection, peerId, offer) {
     }
 }
 
+/**
+ * Handle received answer
+ */
 async function handleAnswer(peerConnection, peerId, answer) {
     try {
         logger(`Handling answer from ${peerId}`);
@@ -396,6 +498,9 @@ async function handleAnswer(peerConnection, peerId, answer) {
     }
 }
 
+/**
+ * Handle received ICE candidate
+ */
 async function handleCandidate(peerConnection, peerId, candidate) {
     try {
         if (candidate.candidate) {
@@ -407,6 +512,13 @@ async function handleCandidate(peerConnection, peerId, candidate) {
     }
 }
 
+// ============================================================================
+// Video Element Management
+// ============================================================================
+
+/**
+ * Create and display local video element
+ */
 function createLocalVideoElement() {
     const videoGrid = document.getElementById('videoGrid');
     const videoWrapper = document.createElement('div');
@@ -431,9 +543,13 @@ function createLocalVideoElement() {
     logger('Local video element created');
 }
 
+/**
+ * Create and display remote video element
+ */
 function createRemoteVideoElement(peerId, peerUsername, mediaStream) {
     const videoGrid = document.getElementById('videoGrid');
 
+    // Check if element already exists
     if (document.getElementById(`video-${peerId}`)) {
         return;
     }
@@ -459,6 +575,9 @@ function createRemoteVideoElement(peerId, peerUsername, mediaStream) {
     logger(`Remote video element created for ${peerUsername}`);
 }
 
+/**
+ * Remove a video element
+ */
 function removeVideoElement(peerId) {
     const element = document.getElementById(`video-${peerId}`);
     if (element) {
@@ -472,6 +591,13 @@ function removeVideoElement(peerId) {
     }
 }
 
+// ============================================================================
+// Control Functions
+// ============================================================================
+
+/**
+ * Toggle microphone
+ */
 function toggleMicrophone() {
     if (!localStream) return;
 
@@ -484,11 +610,14 @@ function toggleMicrophone() {
 
     const btn = document.getElementById('micToggle');
     btn.classList.toggle('active');
-    btn.innerHTML = isEnabled ? 'Microphone' : 'Microphone (Off)';
+    btn.innerHTML = isEnabled ? '🎤 Microphone' : '🔇 Microphone (Off)';
 
     logger(`Microphone ${isEnabled ? 'disabled' : 'enabled'}`);
 }
 
+/**
+ * Toggle camera
+ */
 function toggleCamera() {
     if (!localStream) return;
 
@@ -501,12 +630,16 @@ function toggleCamera() {
 
     const btn = document.getElementById('videoToggle');
     btn.classList.toggle('active');
-    btn.innerHTML = isEnabled ? 'Camera' : 'Camera (Off)';
+    btn.innerHTML = isEnabled ? '📷 Camera' : '📷 Camera (Off)';
 
     logger(`Camera ${isEnabled ? 'disabled' : 'enabled'}`);
 }
 
+/**
+ * Change video resolution
+ */
 async function changeResolution() {
+    // Cycle through resolutions
     const resolutions = [
         { width: 1280, height: 720 },
         { width: 640, height: 480 },
@@ -514,14 +647,17 @@ async function changeResolution() {
     ];
 
     try {
+        // Stop current stream
         localStream.getTracks().forEach(track => track.stop());
 
+        // Rotate to next resolution
         const currentResIdx = resolutions.findIndex(r =>
             r.width === parseInt(stats.videoResolution.split('x')[0])
         );
         const nextResIdx = (currentResIdx + 1) % resolutions.length;
         const newResolution = resolutions[nextResIdx];
 
+        // Get new stream
         const constraints = {
             audio: CONFIG.audioConstraints,
             video: {
@@ -532,12 +668,14 @@ async function changeResolution() {
 
         localStream = await navigator.mediaDevices.getUserMedia(constraints);
 
+        // Disable tracks if admin
         if (roomState.isAdmin) {
             localStream.getTracks().forEach(track => {
                 track.enabled = false;
             });
         }
 
+        // Update all peer connections with new tracks
         localStream.getVideoTracks().forEach(track => {
             Object.values(peerConnections).forEach(pc => {
                 const sender = pc.getSenders().find(s => s.track?.kind === 'video');
@@ -560,37 +698,38 @@ async function changeResolution() {
     }
 }
 
+/**
+ * End the call
+ */
 function endCall() {
     if (confirm('Are you sure you want to end this call?')) {
+        // Emit end_room event if user is initiator
         socket.emit('end_room', {
             room_id: roomState.roomId,
             initiator_user_id: currentUser.id
         });
 
+        // Close all connections
         Object.values(peerConnections).forEach(pc => pc.close());
         peerConnections = {};
 
+        // Stop local stream
         if (localStream) {
             localStream.getTracks().forEach(track => track.stop());
         }
 
+        // Redirect
         window.location.href = '/video/join/';
     }
 }
 
-function nextMatch() {
-    if (confirm('Find a new match?')) {
-        // Clean up current connection
-        Object.values(peerConnections).forEach(pc => pc.close());
-        peerConnections = {};
-        if (localStream) {
-            localStream.getTracks().forEach(track => track.stop());
-        }
-        // Go to random match page to find next
-        window.location.href = '/video/random-match/';
-    }
-}
+// ============================================================================
+// Statistics and Monitoring
+// ============================================================================
 
+/**
+ * Update video resolution display
+ */
 async function updateVideoResolution() {
     try {
         const videoTracks = localStream?.getVideoTracks();
@@ -604,14 +743,23 @@ async function updateVideoResolution() {
     }
 }
 
+/**
+ * Update peer count
+ */
 function updatePeerCount() {
     document.getElementById('peerCount').textContent = roomState.peers.length;
 }
 
+/**
+ * Update connection status
+ */
 function updateConnectionStatus(status) {
     document.getElementById('connectionStatus').textContent = status;
 }
 
+/**
+ * Monitor connection stats
+ */
 async function monitorStats() {
     setInterval(async () => {
         try {
@@ -619,6 +767,7 @@ async function monitorStats() {
                 const stats = await pc.getStats();
                 stats.forEach(report => {
                     if (report.type === 'inbound-rtp' && report.kind === 'video') {
+                        // Update network latency
                         if (report.jitter !== undefined) {
                             stats.networkLatency = Math.round(report.jitter * 1000);
                             document.getElementById('networkLatency').textContent =
@@ -633,6 +782,13 @@ async function monitorStats() {
     }, 5000);
 }
 
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+/**
+ * Show error message
+ */
 function showError(message) {
     const errorBox = document.getElementById('errorBox');
     errorBox.textContent = message;
@@ -643,6 +799,9 @@ function showError(message) {
     }, 5000);
 }
 
+/**
+ * Logger function
+ */
 function logger(message, level = 'info') {
     const timestamp = new Date().toLocaleTimeString();
     const prefix = `[${timestamp}] [${level.toUpperCase()}]`;
@@ -660,19 +819,31 @@ function logger(message, level = 'info') {
     }
 }
 
+// ============================================================================
+// Page Load
+// ============================================================================
+
 document.addEventListener('DOMContentLoaded', async () => {
+    // Initialize conference
     await initializeConference();
+
+    // Start monitoring stats
     monitorStats();
+
     logger('Page loaded and ready');
 });
 
+// Clean up on page unload
 window.addEventListener('beforeunload', () => {
+    // Close all peer connections
     Object.values(peerConnections).forEach(pc => pc.close());
 
+    // Stop local stream
     if (localStream) {
         localStream.getTracks().forEach(track => track.stop());
     }
 
+    // Disconnect socket
     if (socket) {
         socket.disconnect();
     }
