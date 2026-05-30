@@ -8,9 +8,6 @@ This server handles real-time WebRTC signaling:
 - Room state management
 - Silent admin monitoring
 """
-import eventlet
-eventlet.monkey_patch()
-
 import os
 import logging
 from datetime import datetime
@@ -21,6 +18,10 @@ from functools import wraps
 from flask import Flask, request, jsonify
 from flask_socketio import SocketIO, emit, join_room, leave_room, rooms
 from flask_cors import CORS
+
+# Use standard threading instead of eventlet to fix 'ssl.wrap_socket' AttributeError on Python 3.14
+# Removed eventlet monkey_patch() and changed async_mode to 'threading'
+
 
 # ============================================================================
 # Configuration
@@ -45,7 +46,7 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
-    async_mode='eventlet',
+    async_mode='threading',
     ping_timeout=60,
     ping_interval=25,
     logger=True,
